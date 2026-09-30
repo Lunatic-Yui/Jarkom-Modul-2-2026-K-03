@@ -13,15 +13,20 @@
 #
 # http://molly.k-03.com/
 # http://molly.k-03.com/profil
+#
+# CATATAN:
+# File ini berisi command untuk beberapa node.
+# Jalankan hanya bagian yang sesuai pada node terkait.
 # ============================================================
 
 
 # ============================================================
 # [OBLADA]
-# Perbaikan interface jaringan
+# Perbaikan jaringan
 #
 # Pada topologi GNS3, Oblada terhubung ke Switch3 melalui eth1.
-# Oleh karena itu IP 10.65.3.3/24 dipasang pada eth1.
+# IP 10.65.3.3/24 sebelumnya berada pada eth0 sehingga
+# komunikasi jaringan tidak berjalan dengan benar.
 # ============================================================
 
 ip addr del 10.65.3.3/24 dev eth0 2>/dev/null || true
@@ -32,7 +37,17 @@ ip addr add 10.65.3.3/24 dev eth1
 ip route del default 2>/dev/null || true
 ip route add default via 10.65.3.1 dev eth1
 
-ip neigh flush all
+
+# ============================================================
+# [OBLADA]
+# Route langsung menuju subnet DNS
+#
+# Route ditambahkan untuk mencegah ICMP Redirect ketika
+# Oblada mengakses PRAB/TEDD pada jaringan 10.65.2.0/24.
+# ============================================================
+
+ip route show | grep -q '^10.65.2.0/24 dev eth1' || \
+ip route add 10.65.2.0/24 dev eth1
 
 
 # ============================================================
@@ -49,7 +64,7 @@ EOF
 
 # ============================================================
 # [OBLADA]
-# Install Nginx, PHP 8.4, dan PHP-FPM
+# Install Nginx dan PHP-FPM
 # ============================================================
 
 apk update
@@ -106,9 +121,10 @@ sed -i 's|^listen = .*|listen = 127.0.0.1:9000|' \
 # ============================================================
 # [OBLADA]
 # Konfigurasi Nginx
+#
+# Default virtual host tidak perlu dihapus.
+# Pengujian dilakukan melalui hostname oblada.k-03.com.
 # ============================================================
-
-rm -f /etc/nginx/http.d/default.conf
 
 cat > /etc/nginx/http.d/core.conf <<'NGINX'
 server {
@@ -127,10 +143,7 @@ server {
 
     location ~ \.php$ {
         include fastcgi_params;
-
-        fastcgi_param SCRIPT_FILENAME \
-        $document_root$fastcgi_script_name;
-
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_pass 127.0.0.1:9000;
     }
 }
@@ -139,10 +152,17 @@ NGINX
 
 # ============================================================
 # [OBLADA]
-# Validasi dan menjalankan layanan
+# Validasi konfigurasi
 # ============================================================
 
 nginx -t
+php-fpm84 -t
+
+
+# ============================================================
+# [OBLADA]
+# Menjalankan layanan
+# ============================================================
 
 killall php-fpm84 2>/dev/null || true
 php-fpm84
@@ -153,11 +173,45 @@ nginx
 
 # ============================================================
 # [OBLADA]
-# Verifikasi lokal
+# Verifikasi service
 # ============================================================
 
-# curl http://127.0.0.1/
-# curl http://127.0.0.1/profil
+# ss -ltnp | grep -E ':80|:9000'
+
+# Pengujian virtual host lokal:
+#
+# curl -s -H 'Host: oblada.k-03.com' \
+# http://127.0.0.1/ | grep -E '<h1>|Server:'
+#
+# curl -s -H 'Host: oblada.k-03.com' \
+# http://127.0.0.1/profil | grep -E '<h1>|Server:'
+
+
+# ============================================================
+# [OBLADA]
+# Verifikasi menggunakan hostname
+# ============================================================
+
+# host oblada.k-03.com
+
+# curl -s http://oblada.k-03.com/ \
+# | grep -E '<h1>|Server:'
+
+# curl -s http://oblada.k-03.com/profil \
+# | grep -E '<h1>|Server:'
+
+
+# ============================================================
+# [MOLLY]
+# Route langsung menuju subnet DNS
+#
+# Molly menggunakan eth0 untuk jaringan 10.65.3.0/24.
+# Route ini mencegah ICMP Redirect ketika mengakses
+# PRAB/TEDD pada jaringan 10.65.2.0/24.
+# ============================================================
+
+ip route show | grep -q '^10.65.2.0/24 dev eth0' || \
+ip route add 10.65.2.0/24 dev eth0
 
 
 # ============================================================
@@ -174,7 +228,7 @@ EOF
 
 # ============================================================
 # [MOLLY]
-# Install Nginx, PHP 8.4, dan PHP-FPM
+# Install Nginx dan PHP-FPM
 # ============================================================
 
 apk update
@@ -233,8 +287,6 @@ sed -i 's|^listen = .*|listen = 127.0.0.1:9000|' \
 # Konfigurasi Nginx
 # ============================================================
 
-rm -f /etc/nginx/http.d/default.conf
-
 cat > /etc/nginx/http.d/core.conf <<'NGINX'
 server {
     listen 80;
@@ -252,10 +304,7 @@ server {
 
     location ~ \.php$ {
         include fastcgi_params;
-
-        fastcgi_param SCRIPT_FILENAME \
-        $document_root$fastcgi_script_name;
-
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_pass 127.0.0.1:9000;
     }
 }
@@ -264,10 +313,17 @@ NGINX
 
 # ============================================================
 # [MOLLY]
-# Validasi dan menjalankan layanan
+# Validasi konfigurasi
 # ============================================================
 
 nginx -t
+php-fpm84 -t
+
+
+# ============================================================
+# [MOLLY]
+# Menjalankan layanan
+# ============================================================
 
 killall php-fpm84 2>/dev/null || true
 php-fpm84
@@ -278,43 +334,90 @@ nginx
 
 # ============================================================
 # [MOLLY]
-# Verifikasi lokal
+# Verifikasi service
 # ============================================================
 
-# curl http://127.0.0.1/
-# curl http://127.0.0.1/profil
+# ss -ltnp | grep -E ':80|:9000'
+
+# Pengujian virtual host lokal:
+#
+# curl -s -H 'Host: molly.k-03.com' \
+# http://127.0.0.1/ | grep -E '<h1>|Server:'
+#
+# curl -s -H 'Host: molly.k-03.com' \
+# http://127.0.0.1/profil | grep -E '<h1>|Server:'
 
 
 # ============================================================
-# [CLIENT - contoh: ALPHA]
+# [MOLLY]
 # Verifikasi menggunakan hostname
 # ============================================================
 
-# curl http://oblada.k-03.com/
-# curl http://oblada.k-03.com/profil
+# host molly.k-03.com
 
-# curl http://molly.k-03.com/
-# curl http://molly.k-03.com/profil
+# curl -s http://molly.k-03.com/ \
+# | grep -E '<h1>|Server:'
+
+# curl -s http://molly.k-03.com/profil \
+# | grep -E '<h1>|Server:'
+
+
+# ============================================================
+# [CLIENT - ALPHA]
+# Verifikasi final kedua web server Core
+# ============================================================
+
+# curl -s http://oblada.k-03.com/ \
+# | grep -E '<h1>|Server:'
+
+# curl -s http://oblada.k-03.com/profil \
+# | grep -E '<h1>|Server:'
+
+# curl -s http://molly.k-03.com/ \
+# | grep -E '<h1>|Server:'
+
+# curl -s http://molly.k-03.com/profil \
+# | grep -E '<h1>|Server:'
 
 
 # ============================================================
 # HASIL YANG DIHARAPKAN
 # ============================================================
 
-# OBLADA:
+# OBLADA
+#
 # Halaman Beranda
 # Server: oblada
 #
 # Halaman Profil
 # Server: oblada
 #
-# MOLLY:
+#
+# MOLLY
+#
 # Halaman Beranda
 # Server: molly
 #
 # Halaman Profil
 # Server: molly
 #
-# Path /profil harus dapat diakses tanpa ".php".
-# PHP harus benar-benar dieksekusi oleh PHP-FPM,
-# bukan menampilkan source code PHP.
+#
+# PHP harus diproses oleh PHP-FPM pada:
+# 127.0.0.1:9000
+#
+# Nginx berjalan pada:
+# port 80
+#
+# Path /profil harus dapat digunakan tanpa menulis
+# ekstensi .php.
+#
+# Oblada menggunakan:
+# 10.65.3.3/24 pada eth1
+#
+# Molly menggunakan:
+# 10.65.3.2/24 pada eth0
+#
+# Kedua node mempunyai route langsung menuju:
+# 10.65.2.0/24
+#
+# sehingga komunikasi menuju DNS PRAB/TEDD stabil.
