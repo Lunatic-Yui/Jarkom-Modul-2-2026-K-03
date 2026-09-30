@@ -5,10 +5,42 @@
 # Authoritative DNS Master-Slave
 # Domain : k-03.com
 #
+# ROOTKIT
 # PRAB : 10.65.2.3 -> DNS Master
 # TEDD : 10.65.2.2 -> DNS Slave
 # PENNY: 10.65.5.2 -> Apex k-03.com
+#
+# CATATAN:
+# File ini berisi command untuk beberapa node.
+# Jalankan hanya bagian yang sesuai pada node terkait.
 # ============================================================
+
+
+# ============================================================
+# [ROOTKIT]
+# Menambahkan gateway untuk jaringan DNS dan Core/Vault
+# pada interface eth1
+# ============================================================
+
+ip addr show eth1 | grep -q '10.65.2.1/24' || \
+ip addr add 10.65.2.1/24 dev eth1
+
+ip addr show eth1 | grep -q '10.65.3.1/24' || \
+ip addr add 10.65.3.1/24 dev eth1
+
+
+# ============================================================
+# [ROOTKIT]
+# Verifikasi
+# ============================================================
+
+# ip addr show eth1
+# ip route | grep '10.65'
+
+# Hasil yang diharapkan pada eth1:
+# 10.65.1.1/24
+# 10.65.2.1/24
+# 10.65.3.1/24
 
 
 # ============================================================
@@ -48,6 +80,12 @@ zone "k-03.com" {
 };
 CONF
 
+
+# ============================================================
+# [PRAB]
+# Forward Zone k-03.com
+# ============================================================
+
 cat > /var/bind/db.k-03.com <<'ZONE'
 $TTL 86400
 
@@ -67,6 +105,12 @@ prab    IN  A       10.65.2.3
 tedd    IN  A       10.65.2.2
 ZONE
 
+
+# ============================================================
+# [PRAB]
+# Validasi dan menjalankan DNS Master
+# ============================================================
+
 named-checkconf
 named-checkzone k-03.com /var/bind/db.k-03.com
 
@@ -75,9 +119,17 @@ named -c /etc/bind/named.conf
 
 
 # ============================================================
+# [PRAB]
+# Verifikasi
+# ============================================================
+
+# dig @10.65.2.3 k-03.com A
+# dig @10.65.2.3 k-03.com SOA +short
+
+
+# ============================================================
 # [TEDD]
 # Install BIND dan konfigurasi DNS Slave
-# Jalankan bagian ini pada node TEDD
 # ============================================================
 
 apk update
@@ -110,6 +162,12 @@ zone "k-03.com" {
 };
 CONF
 
+
+# ============================================================
+# [TEDD]
+# Validasi dan menjalankan DNS Slave
+# ============================================================
+
 named-checkconf
 
 killall named 2>/dev/null || true
@@ -117,8 +175,20 @@ named -c /etc/bind/named.conf
 
 
 # ============================================================
-# [SEMUA NODE NON-ROUTER]
-# Resolver setelah DNS internal aktif
+# [TEDD]
+# Verifikasi
+# ============================================================
+
+# dig @10.65.2.2 k-03.com A
+# dig @10.65.2.2 k-03.com SOA +short
+
+# AXFR dari TEDD menuju PRAB:
+# dig @10.65.2.3 k-03.com AXFR
+
+
+# ============================================================
+# [CLIENT / NODE NON-ROUTER]
+# Konfigurasi resolver internal
 # ============================================================
 
 cat > /etc/resolv.conf <<'EOF'
@@ -129,20 +199,41 @@ EOF
 
 
 # ============================================================
-# [VERIFIKASI]
+# [CLIENT]
+# Verifikasi resolusi
 # ============================================================
 
-# Dari PRAB:
-# dig @10.65.2.3 k-03.com A
-# dig @10.65.2.3 prab.k-03.com A
+# host prab.k-03.com
+# host tedd.k-03.com
 
-# Dari TEDD:
-# dig @10.65.2.2 k-03.com A
-# dig @10.65.2.2 tedd.k-03.com A
-# dig @10.65.2.2 k-03.com SOA +short
+# ping -c 2 prab.k-03.com
+# ping -c 2 tedd.k-03.com
+# ping -c 2 k-03.com
 
-# Dari client:
-# ping -c 1 prab.k-03.com
-# ping -c 1 tedd.k-03.com
-# ping -c 1 k-03.com
-# ping -c 1 google.com
+# Pengujian DNS forwarder:
+# ping -c 2 google.com
+
+
+# ============================================================
+# HASIL YANG DIHARAPKAN
+# ============================================================
+
+# PRAB:
+# DNS Master pada 10.65.2.3
+#
+# TEDD:
+# DNS Slave pada 10.65.2.2
+#
+# k-03.com:
+# 10.65.5.2
+#
+# PRAB dan TEDD harus menjawab zona k-03.com
+# secara authoritative.
+#
+# Client menggunakan:
+# 10.65.2.3
+# 10.65.2.2
+# 192.168.122.1
+#
+# Resolusi domain internal dan domain eksternal
+# harus berhasil.
