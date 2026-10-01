@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# ============================================================
 # SOAL 4
 # Authoritative DNS Master-Slave
 # Domain : k-03.com
@@ -13,14 +12,11 @@
 # CATATAN:
 # File ini berisi command untuk beberapa node.
 # Jalankan hanya bagian yang sesuai pada node terkait.
-# ============================================================
 
 
-# ============================================================
 # [ROOTKIT]
 # Menambahkan gateway untuk jaringan DNS dan Core/Vault
 # pada interface eth1
-# ============================================================
 
 ip addr show eth1 | grep -q '10.65.2.1/24' || \
 ip addr add 10.65.2.1/24 dev eth1
@@ -43,10 +39,8 @@ ip addr add 10.65.3.1/24 dev eth1
 # 10.65.3.1/24
 
 
-# ============================================================
 # [PRAB]
 # Install BIND dan konfigurasi DNS Master
-# ============================================================
 
 apk update
 apk add bind bind-tools

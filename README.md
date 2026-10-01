@@ -34,7 +34,7 @@ iface eth0 inet dhcp
 
 auto eth1
 iface eth1 inet static
-    address 10.65.1.1
+    address 10.65.2.1
     netmask 255.255.255.0
     echo "nameserver 8.8.8.8" > /etc/resolv.conf  
 
@@ -526,3 +526,33 @@ Hasil:
 ![image](./assets/jawaban/result-soal-10.png)
 
 Pengujian menunjukkan bahwa Oblada dan Molly berhasil menjalankan layanan web dinamis menggunakan Nginx dan PHP-FPM. Halaman Beranda dan Profil dapat ditampilkan pada kedua server, serta identitas server masing-masing berhasil ditampilkan melalui PHP. Path `/profil` juga dapat diakses tanpa ekstensi `.php`, sehingga konfigurasi rewrite telah berjalan sesuai requirement.
+
+11. Konfigurasikan Penny (menggunakan Apache) sebagai reverse proxy yang mengarah ke semua node di area vault (Obladi & Desmond). Sementara itu, konfigurasikan Abbey (menggunakan Nginx) sebagai reverse proxy menuju area core (Oblada & Molly). Pastikan kedua gerbang ini meneruskan identitas asli pengunjung ke server backend dengan melakukan forwarding header Host dan X-Real-IP. Buktikan bahwa Penny dan Abbey berhasil mendistribusikan lalu lintas dengan tepat.
+
+Untuk scriptnya seperti berikut
+
+[setup-abbey.sh](./src/soal-11/setup-abbey.sh)
+
+[setup-penny.sh](./src/soal-11/setup-penny.sh)
+
+Dan menambahkan ke obladi dan desmond dengan
+
+```cfg
+echo 'LogFormat "%{Host}i %{X-Real-IP}i" hdr' > /etc/apache2/conf.d/hdr.conf
+echo 'CustomLog /var/log/apache2/hdr.log hdr' >> /etc/apache2/conf.d/hdr.conf
+httpd -t && killall httpd 
+httpd
+```
+
+pada configurasinya untuk prove. Hasilnya ketika kita melakukan
+
+![image](./assets/jawaban/soal-11/curl-result.png)
+
+maka di obladi:
+
+![image](./assets/jawaban/soal-11/obladi-curl.png)
+
+(ini sebelumnya saya test dulu dan berhasil ternyata) dan di desmond:
+
+![image](./assets/jawaban/soal-11/desmond-curl.png)
+
