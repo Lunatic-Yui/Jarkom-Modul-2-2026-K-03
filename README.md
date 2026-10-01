@@ -1779,3 +1779,7 @@ Nah dalam script ini saya kasih automatic tiap nodenya. Terpasang pada: prab, te
 
 [sesudah](./assets/jawaban/soal-20/sesudah/)
 
+Script tambahan:
+
+- [script.sh](./src/jaga-jaga/script.sh) fungsinya ketika no 18 gk stabil
+- [check-system.sh](./src/jaga-jaga/check-system.sh) fungsinya buat check apakah servernya masih up or belum
