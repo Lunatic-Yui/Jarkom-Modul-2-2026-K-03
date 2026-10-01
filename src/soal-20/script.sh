@@ -20,7 +20,7 @@ is_running() {
     return 1
 }
 
-svc_cmd() {      # perintah start manual tiap service
+svc_cmd() {      
     case "$1" in
         named)     echo 'named -c /etc/bind/named.conf' ;;
         apache2)   echo 'mkdir -p /run/apache2; rm -f /run/apache2/httpd.pid; httpd' ;;
@@ -29,7 +29,7 @@ svc_cmd() {      # perintah start manual tiap service
     esac
 }
 
-add_up() {       # $1=tag  $2=perintah ; sisipkan "up" di stanza interface (idempotent)
+add_up() {      
     tag="$1"; cmd="$2"
     [ -f "$IFACES" ] || { echo "!! $IFACES tidak ada"; return 1; }
     if grep -q "^[[:space:]]*# auto-$tag\$" "$IFACES"; then
